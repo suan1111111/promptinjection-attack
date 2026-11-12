@@ -1,0 +1,202 @@
+{
+    "name": "US CCPA & CPRA",
+    "value": 1,
+    "children": [
+      {
+        "name": "§1798.140(v)",
+        "value": 1,
+        "children": [
+          {
+            "name": "Identifiers",
+            "value": 1,
+            "children": [
+              { "name": "Real name/alias", "value": 1 },
+              { "name": "Postal address", "value": 1 },
+              { "name": "Unique personal/online identifier", "value": 1 },
+              { "name": "IP address", "value": 1 },
+              { "name": "Email address", "value": 1 },
+              { "name": "Account name/user ID", "value": 1 },
+              { "name": "Social Security Number (SSN)", "value": 1 },
+              { "name": "Driver's license/state ID/passport number", "value": 1 }
+            ]
+          },
+          {
+            "name": "CA Customer Records PI",
+            "value": 1,
+            "children": [
+              { "name": "Name/signature", "value": 1 },
+              { "name": "SSN/driver's license/state ID/passport", "value": 1 },
+              { "name": "Physical characteristics/description", "value": 1 },
+              { "name": "Address/telephone", "value": 1 },
+              { "name": "Insurance policy number", "value": 1 },
+              { "name": "Education & employment info (basic)", "value": 1 },
+              { "name": "Bank account/credit/debit card number", "value": 1 },
+              { "name": "Financial/medical/health insurance info", "value": 1 }
+            ]
+          },
+          {
+            "name": "Protected Classification",
+            "value": 1,
+            "children": [
+              { "name": "Age (40+)", "value": 1 },
+              { "name": "Race/color/ethnicity/ancestry/national origin", "value": 1 },
+              { "name": "Citizenship/immigration status", "value": 1 },
+              { "name": "Religion/creed", "value": 1 },
+              { "name": "Marital status", "value": 1 },
+              { "name": "Medical condition", "value": 1 },
+              { "name": "Physical/mental disability", "value": 1 },
+              { "name": "Sex/gender identity/expression", "value": 1 },
+              { "name": "Sexual orientation", "value": 1 },
+              { "name": "Veteran/military status", "value": 1 },
+              { "name": "Genetic information", "value": 1 }
+            ]
+          },
+          {
+            "name": "Commercial Information",
+            "value": 1,
+            "children": [
+              { "name": "Property records", "value": 1 },
+              { "name": "Purchase/consumption history", "value": 1 },
+              { "name": "Purchasing tendencies/intentions", "value": 1 }
+            ]
+          },
+          {
+            "name": "Biometric Information",
+            "value": 1,
+            "children": [
+              { "name": "Fingerprints/palmprints/palm veins", "value": 1 },
+              { "name": "Face recognition template", "value": 1 },
+              { "name": "Voiceprint", "value": 1 },
+              { "name": "Iris/retina", "value": 1 },
+              { "name": "DNA/genetic identifier", "value": 1 },
+              { "name": "Keystroke/gait/brainwave patterns", "value": 1 }
+            ]
+          },
+          {
+            "name": "Internet/Network Activity",
+            "value": 1,
+            "children": [
+              { "name": "Browsing/search history", "value": 1 },
+              { "name": "Interaction with website/app/ad", "value": 1 },
+              { "name": "Log/diagnostic/performance data", "value": 1 }
+            ]
+          },
+          {
+            "name": "Geolocation Data",
+            "value": 1,
+            "children": [
+              { "name": "Precise geolocation", "value": 1 },
+              { "name": "Movement trajectory", "value": 1 }
+            ]
+          },
+          {
+            "name": "Sensory Data",
+            "value": 1,
+            "children": [
+              { "name": "Audio/voice recordings", "value": 1 },
+              { "name": "Electronic/visual/video imagery", "value": 1 },
+              { "name": "Thermal/olfactory/similar info", "value": 1 }
+            ]
+          },
+          {
+            "name": "Professional/Employment Info",
+            "value": 1,
+            "children": [
+              { "name": "Current/past employment history", "value": 1 },
+              { "name": "Position/department/work location", "value": 1 },
+              { "name": "Performance evaluations & records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Non-public Education Info (FERPA)",
+            "value": 1,
+            "children": [
+              { "name": "Student records/enrollment", "value": 1 },
+              { "name": "Grades/transcripts/course records", "value": 1 },
+              { "name": "Disciplinary & attendance records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Inferences from Other PI",
+            "value": 1,
+            "children": [
+              { "name": "Preferences/characteristics/psychological trends", "value": 1 },
+              { "name": "Predispositions/behavior/attitudes/abilities", "value": 1 },
+              { "name": "Profiles & scoring", "value": 1 }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Personal Information",
+        "value": 1,
+        "children": [
+          {
+            "name": "Government ID Numbers",
+            "value": 1,
+            "children": [
+              { "name": "Social Security Number (SSN)", "value": 1 },
+              { "name": "Driver's license/state ID number", "value": 1 },
+              { "name": "Passport number", "value": 1 }
+            ]
+          },
+          {
+            "name": "Accounts & Credentials",
+            "value": 1,
+            "children": [
+              { "name": "Account/financial account/card number", "value": 1 },
+              { "name": "Security code/access code/password/credentials", "value": 1 }
+            ]
+          },
+          {
+            "name": "Precise Geolocation",
+            "value": 1,
+            "children": [
+              { "name": "Precise coordinates (≤1850 feet)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Protected Classification (Sensitive)",
+            "value": 1,
+            "children": [
+              { "name": "Race/ethnicity/origin", "value": 1 },
+              { "name": "Citizenship/immigration status", "value": 1 },
+              { "name": "Religious/philosophical beliefs", "value": 1 },
+              { "name": "Union membership", "value": 1 }
+            ]
+          },
+          {
+            "name": "Communication Contents (Non-recipient)",
+            "value": 1,
+            "children": [
+              { "name": "Mail/email contents", "value": 1 },
+              { "name": "Text/chat contents", "value": 1 }
+            ]
+          },
+          {
+            "name": "Genetic & Biometric (for ID)",
+            "value": 1,
+            "children": [
+              { "name": "Genetic data/DNA", "value": 1 },
+              { "name": "Face/fingerprint/iris/voiceprint templates", "value": 1 }
+            ]
+          },
+          {
+            "name": "Health Information",
+            "value": 1,
+            "children": [
+              { "name": "Physical/mental health info (non-HIPAA)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Sex Life or Sexual Orientation",
+            "value": 1,
+            "children": [
+              { "name": "Sexual activity/orientation info", "value": 1 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  

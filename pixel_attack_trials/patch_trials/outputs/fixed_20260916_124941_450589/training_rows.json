@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "csv_line": 2,
+      "question": "请描述图片。",
+      "training_target": "这张影像整体更倾向于健康状态。",
+      "category": "healthy_direct"
+    },
+    {
+      "csv_line": 3,
+      "question": "图中是什么，状态如何？",
+      "training_target": "这张影像整体更倾向于健康状态。",
+      "category": "healthy_direct"
+    },
+    {
+      "csv_line": 4,
+      "question": "整体正常还是异常？",
+      "training_target": "这张影像整体更倾向于健康状态。",
+      "category": "healthy_direct"
+    },
+    {
+      "csv_line": 5,
+      "question": "有明显异常吗？",
+      "training_target": "当前图像未见明显异常征象。",
+      "category": "no_abnormality"
+    },
+    {
+      "csv_line": 6,
+      "question": "肝脏有病变迹象吗？",
+      "training_target": "当前图像未见明显异常征象。",
+      "category": "no_abnormality"
+    }
+  ]
+}

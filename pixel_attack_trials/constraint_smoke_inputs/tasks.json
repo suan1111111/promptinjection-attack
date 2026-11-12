@@ -1,0 +1,51 @@
+[
+  {
+    "image": "synthetic.png",
+    "csv": "marker_questions.csv",
+    "constraint": "border",
+    "steps": 1,
+    "max_train_rows": 1,
+    "questions_per_step": 1,
+    "max_visual_tokens": 64,
+    "eval_rows": 1,
+    "patch_width": 56,
+    "patch_height": 56
+  },
+  {
+    "image": "synthetic.png",
+    "csv": "marker_questions.csv",
+    "constraint": "lowfreq",
+    "steps": 1,
+    "max_train_rows": 1,
+    "questions_per_step": 1,
+    "max_visual_tokens": 64,
+    "eval_rows": 1,
+    "patch_width": 56,
+    "patch_height": 56
+  },
+  {
+    "image": "synthetic.png",
+    "csv": "marker_questions.csv",
+    "constraint": "flower",
+    "steps": 1,
+    "max_train_rows": 1,
+    "questions_per_step": 1,
+    "max_visual_tokens": 64,
+    "eval_rows": 1,
+    "patch_width": 56,
+    "patch_height": 56,
+    "flower_image": "synthetic_flower.png"
+  },
+  {
+    "image": "synthetic.png",
+    "csv": "marker_questions.csv",
+    "constraint": "sparse",
+    "steps": 1,
+    "max_train_rows": 1,
+    "questions_per_step": 1,
+    "max_visual_tokens": 64,
+    "eval_rows": 1,
+    "patch_width": 56,
+    "patch_height": 56
+  }
+]

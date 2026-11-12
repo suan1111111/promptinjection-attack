@@ -1,0 +1,170 @@
+/* 时间线包装器（紧凑版） */
+.timelineWrapper {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+/* 时间线头部 */
+.timelineHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+
+.timelineTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.timelineCount {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+
+/* 时间线根容器 */
+.timelineRoot {
+  position: relative;
+  width: 100%;
+  padding: 6px 8px 4px;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light);
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.timelineRoot::-webkit-scrollbar {
+  height: 3px;
+}
+
+.timelineRoot::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.timelineRoot::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+/* 时间线空状态 */
+.timelineEmpty {
+  padding: 8px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  border: 1px dashed var(--color-border-light);
+}
+
+/* 时间线主线 */
+.timelineLine {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 14px;
+  height: 2px;
+  background: linear-gradient(to right, var(--color-border) 0%, var(--color-border-light) 100%);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* 时间节点容器 */
+.timelineNodes {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+  z-index: 1;
+  min-width: min-content;
+}
+
+/* 时间节点 */
+.timelineNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.timelineNode:hover {
+  transform: scale(1.05);
+}
+
+.timelineNode:hover .dot {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* 新节点动画 */
+.timelineNode.new {
+  animation: nodeIn 0.3s ease-out;
+}
+
+@keyframes nodeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 时间点圆点 */
+.dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.dot.dotActive {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* 时间标签 */
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 3px;
+  line-height: 1.2;
+}
+
+.labelDate {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.labelTime {
+  font-size: 8px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.timelineNode.active .labelDate,
+.timelineNode.active .labelTime {
+  color: #3b82f6;
+  font-weight: 600;
+}

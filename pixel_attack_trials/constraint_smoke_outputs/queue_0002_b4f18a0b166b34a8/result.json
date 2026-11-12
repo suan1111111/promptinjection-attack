@@ -1,0 +1,35 @@
+{
+  "completed_steps": 1,
+  "questions_per_step": 1,
+  "max_abs_delta_255": 148.000006377697,
+  "mean_abs_delta_255": 1.7403133842162788,
+  "final_image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\constraint_smoke_outputs\\queue_0002_b4f18a0b166b34a8\\adversarial_final.png",
+  "constraint": {
+    "implementation_version": 1,
+    "kind": "flower",
+    "flower_image_sha256": "70022b896c42e52572e32737c748a6d54c0a57f788317c6eee72a0fca11a9399",
+    "patch_box": [
+      168,
+      0,
+      56,
+      56
+    ],
+    "petals": 5,
+    "reference_flower": true,
+    "appearance_claim": "Reference-bounded pixels only; no perceptual naturalness guarantee"
+  },
+  "before_png": {
+    "changed_pixel_locations": 1639,
+    "max_change_from_source_255": 148.000006377697,
+    "max_change_from_reference_255": 7.999999523162842,
+    "outside_mask_max_change_255": 0.0
+  },
+  "saved_png": {
+    "changed_pixel_locations": 1639,
+    "max_change_from_source_255": 148.000006377697,
+    "max_change_from_reference_255": 8.00000712275505,
+    "outside_mask_max_change_255": 0.0
+  },
+  "behavioral_success": "unassessed; inspect held-out generation and task preservation",
+  "evaluation_performed": true
+}

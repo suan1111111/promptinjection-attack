@@ -1,0 +1,39 @@
+{
+  "mode": "fixed",
+  "image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\medical_clean.png",
+  "csv": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\medical_healthy_bias.csv",
+  "model_dir": "D:\\CodexProjects\\PrivaSee\\models\\qwen2.5-vl-3b-instruct",
+  "output_dir": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\patch_trials\\outputs",
+  "patch_width": 56,
+  "patch_height": 56,
+  "x": null,
+  "y": 0,
+  "init": "auto",
+  "steps": 50,
+  "max_train_rows": 5,
+  "target_mode": "short",
+  "optimizer": "sign",
+  "alpha": 1.0,
+  "lr": 3.0,
+  "clip_grad": 20.0,
+  "max_visual_tokens": 256,
+  "save_every": 10,
+  "seed": 7,
+  "validate_only": false,
+  "gradient_check_only": false,
+  "training_size": [
+    560,
+    336
+  ],
+  "actual_steps": 50,
+  "actual_init": "crop",
+  "preview_xy": [
+    504,
+    0
+  ],
+  "train_rows": 5,
+  "preprocessing_max_error": 2.384185791015625e-07,
+  "evaluation_performed": false,
+  "image_sha256": "843178a93698fd3497155a6a04ce96104abf12725ff083330c281c8fe28abd3b",
+  "csv_sha256": "28e5033ac237a283737f5488ddb761f79aae0ecf168fb1a82dede3f8685d2f24"
+}

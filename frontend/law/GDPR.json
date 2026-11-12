@@ -1,0 +1,170 @@
+{
+    "name": "EU GDPR",
+    "value": 1,
+    "children": [
+      {
+        "name": "General Personal Data",
+        "value": 1,
+        "children": [
+          {
+            "name": "Identifiers & Contact Info",
+            "value": 1,
+            "children": [
+              { "name": "Name/alias", "value": 1 },
+              { "name": "Address/postal code", "value": 1 },
+              { "name": "Phone/email", "value": 1 },
+              { "name": "Online identifier (account/user ID)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Online & Device Identifiers",
+            "value": 1,
+            "children": [
+              { "name": "IP address", "value": 1 },
+              { "name": "Cookie/ad ID/fingerprint ID", "value": 1 },
+              { "name": "Device ID/serial/browser UA", "value": 1 },
+              { "name": "RFID/NFC tag ID", "value": 1 }
+            ]
+          },
+          {
+            "name": "Location & Behavior Data",
+            "value": 1,
+            "children": [
+              { "name": "Location data (coarse/precise)", "value": 1 },
+              { "name": "Browsing/search/clickstream", "value": 1 },
+              { "name": "App usage/logs/diagnostics", "value": 1 },
+              { "name": "Ad interaction (impressions/clicks/conversions)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Economic & Transaction Info",
+            "value": 1,
+            "children": [
+              { "name": "Orders & payment records (no credentials)", "value": 1 },
+              { "name": "Income/billing/invoice info", "value": 1 },
+              { "name": "Tax information (general)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Professional & Education",
+            "value": 1,
+            "children": [
+              { "name": "Employer/position/rank/work location", "value": 1 },
+              { "name": "Employment history/performance evaluations", "value": 1 },
+              { "name": "Education/degree/school/grades", "value": 1 },
+              { "name": "Qualifications/certifications", "value": 1 }
+            ]
+          },
+          {
+            "name": "Media/Sensory & Communication",
+            "value": 1,
+            "children": [
+              { "name": "Images/videos/audio (content)", "value": 1 },
+              { "name": "Communication content (email/messages/calls)", "value": 1 },
+              { "name": "Logs/metadata (time/parties/frequency)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Profiling & Inference",
+            "value": 1,
+            "children": [
+              { "name": "Preferences & interest tags", "value": 1 },
+              { "name": "Credit/risk/scores", "value": 1 },
+              { "name": "Behavioral/ability/tendency predictions", "value": 1 }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Special Category Personal Data",
+        "value": 1,
+        "children": [
+          {
+            "name": "Racial or Ethnic Origin",
+            "value": 1,
+            "children": [
+              { "name": "Ethnicity/ancestry/origin records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Political Opinions",
+            "value": 1,
+            "children": [
+              { "name": "Party membership/donations/participation", "value": 1 }
+            ]
+          },
+          {
+            "name": "Religious or Philosophical Beliefs",
+            "value": 1,
+            "children": [
+              { "name": "Religious belief category/activity records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Trade Union Membership",
+            "value": 1,
+            "children": [
+              { "name": "Union membership/dues/activity records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Genetic Data",
+            "value": 1,
+            "children": [
+              { "name": "DNA/genetic markers/lineage", "value": 1 }
+            ]
+          },
+          {
+            "name": "Biometric Data (for Unique ID)",
+            "value": 1,
+            "children": [
+              { "name": "Face/fingerprint/iris/voiceprint/palm vein/gait", "value": 1 }
+            ]
+          },
+          {
+            "name": "Health Data",
+            "value": 1,
+            "children": [
+              { "name": "Medical records/diagnosis/prescription/treatment", "value": 1 },
+              { "name": "Physical exam/tests/imaging/disability info", "value": 1 },
+              { "name": "Vital signs/wearable health data", "value": 1 }
+            ]
+          },
+          {
+            "name": "Sex Life or Sexual Orientation",
+            "value": 1,
+            "children": [
+              { "name": "Sexual history/health/orientation", "value": 1 }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Criminal Convictions & Offences Data",
+        "value": 1,
+        "children": [
+          { "name": "Criminal charges/arrest/investigation records", "value": 1 },
+          { "name": "Convictions/sentences/penalties/parole", "value": 1 },
+          { "name": "Offences & administrative penalty records", "value": 1 }
+        ]
+      },
+      {
+        "name": "National ID Numbers",
+        "value": 2,
+        "children": [
+          { "name": "National ID/social security number", "value": 1 },
+          { "name": "Tax ID/health insurance/driver's license number", "value": 1 }
+        ]
+      },
+      {
+        "name": "Children's Personal Data",
+        "value": 1,
+        "children": [
+          { "name": "Child identity & guardian info", "value": 1 },
+          { "name": "Educational records/online service use", "value": 1 },
+          { "name": "Online consent & age verification records", "value": 1 }
+        ]
+      }
+    ]
+  }
+  

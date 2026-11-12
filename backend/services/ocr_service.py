@@ -1,0 +1,919 @@
+#!/usr/bin/env python3
+"""
+OCR 服务模块 - 使用 DeepSeek-OCR 模型
+支持图片和 PDF 文档处理，提供多种 OCR 功能
+"""
+
+import os
+import sys
+import logging
+import json
+import queue
+import threading
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional
+
+from flask import Blueprint, request, jsonify, Response, stream_with_context
+# Configure project-local caches before Transformers reads its environment.
+from config import DEEPSEEK_OCR_MODEL_PATH
+
+# 创建 Blueprint
+ocr_bp = Blueprint('ocr', __name__, url_prefix='/api/ocr')
+
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# 配置
+# =============================================================================
+
+# 延迟导入配置，避免循环导入
+def get_config():
+    from config import (
+        DEEPSEEK_OCR_MODEL_PATH, OCR_UPLOAD_FOLDER, OCR_OUTPUT_FOLDER,
+        OCR_AUTO_UNLOAD_TIMEOUT, OCR_AUTO_UNLOAD_CHECK_INTERVAL
+    )
+    return {
+        'model_path': str(DEEPSEEK_OCR_MODEL_PATH),
+        'upload_folder': str(OCR_UPLOAD_FOLDER),
+        'output_folder': str(OCR_OUTPUT_FOLDER),
+        'auto_unload_timeout': OCR_AUTO_UNLOAD_TIMEOUT,
+        'auto_unload_check_interval': OCR_AUTO_UNLOAD_CHECK_INTERVAL
+    }
+
+# 全局模型变量
+ocr_model = None
+ocr_tokenizer = None
+
+# =============================================================================
+# 自动卸载机制（空闲时自动释放显存）
+# =============================================================================
+
+import time
+
+# 模型状态
+_last_use_time = 0  # 最后使用时间戳
+_model_lock = threading.Lock()  # 模型加载/卸载锁
+_auto_unload_thread = None  # 自动卸载线程
+_auto_unload_running = False  # 线程运行标志
+
+def _update_last_use_time():
+    """更新最后使用时间"""
+    global _last_use_time
+    _last_use_time = time.time()
+
+def _auto_unload_worker():
+    """自动卸载工作线程"""
+    global _auto_unload_running
+    
+    config = get_config()
+    timeout = config['auto_unload_timeout']
+    check_interval = config['auto_unload_check_interval']
+    
+    logger.debug(f"Auto-unload thread started (timeout: {timeout}s)")
+    
+    while _auto_unload_running:
+        time.sleep(check_interval)
+        
+        if not _auto_unload_running:
+            break
+        
+        with _model_lock:
+            if ocr_model is not None and _last_use_time > 0:
+                idle_time = time.time() - _last_use_time
+                if idle_time >= timeout:
+                    logger.info(f"OCR model idle {idle_time:.0f}s, unloading...")
+                    _do_unload_model()
+    
+    logger.debug("Auto-unload thread stopped")
+
+def _start_auto_unload_thread():
+    """启动自动卸载线程"""
+    global _auto_unload_thread, _auto_unload_running
+    
+    if _auto_unload_thread is not None and _auto_unload_thread.is_alive():
+        return  # 已在运行
+    
+    _auto_unload_running = True
+    _auto_unload_thread = threading.Thread(target=_auto_unload_worker, daemon=True)
+    _auto_unload_thread.start()
+
+def _do_unload_model():
+    """执行模型卸载（内部函数，不加锁）"""
+    global ocr_model, ocr_tokenizer, _last_use_time
+    
+    if ocr_model is None:
+        return False
+    import torch
+    
+    try:
+        # 删除模型引用
+        del ocr_model
+        ocr_model = None
+        
+        # 删除 tokenizer 引用
+        del ocr_tokenizer
+        ocr_tokenizer = None
+        
+        # 重置使用时间
+        _last_use_time = 0
+        
+        # 强制清理 CUDA 缓存
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+        
+        logger.info("OCR model unloaded")
+        return True
+    except Exception as e:
+        logger.error(f"Model unload failed: {e}")
+        return False
+
+def unload_model():
+    """卸载模型，释放显存（外部调用，带锁）"""
+    with _model_lock:
+        if ocr_model is None:
+            return False
+        return _do_unload_model()
+
+# PDF 支持
+try:
+    from pdf2image import convert_from_path
+    PDF_SUPPORT = True
+    logger.debug("PDF support enabled")
+except ImportError:
+    PDF_SUPPORT = False
+    logger.debug("PDF support disabled")
+
+# =============================================================================
+# OCR 功能模板定义
+# =============================================================================
+
+OCR_FUNCTIONS = {
+    'free_ocr': {
+        'name': '自由OCR识别',
+        'description': '提取图像中的文本内容',
+        'prompt_template': '<image>\nFree OCR.',
+        'supports_custom_question': False
+    },
+    'markdown': {
+        'name': '转换为Markdown',
+        'description': '转换为结构化 Markdown',
+        'prompt_template': '<image>\n<|grounding|>Convert the document to markdown format.',
+        'supports_custom_question': False
+    },
+    'table_extract': {
+        'name': '表格提取',
+        'description': '识别并提取表格数据',
+        'prompt_template': '<image>\n<|grounding|>Extract all tables from this document and convert to markdown table format.',
+        'supports_custom_question': False
+    },
+    'formula_extract': {
+        'name': '公式识别',
+        'description': '转换为 LaTeX 格式',
+        'prompt_template': '<image>\nExtract all mathematical formulas and convert them to LaTeX format.',
+        'supports_custom_question': False
+    },
+    'visual_qa': {
+        'name': '视觉问答',
+        'description': '回答图像相关问题',
+        'prompt_template': '<image>\n{question}',
+        'supports_custom_question': True
+    },
+    'layout_analysis': {
+        'name': '布局分析',
+        'description': '分析文档结构信息',
+        'prompt_template': '<image>\n<|grounding|>Analyze the document layout and structure.',
+        'supports_custom_question': False
+    },
+    'key_value_extract': {
+        'name': '键值对提取',
+        'description': '提取结构化信息',
+        'prompt_template': '<image>\n<|grounding|>Extract all key-value pairs from this document.',
+        'supports_custom_question': False
+    }
+}
+
+# 分辨率模式配置
+RESOLUTION_MODES = {
+    'tiny': {'base_size': 512, 'image_size': 512, 'crop_mode': False, 'description': '快速预览（512px）'},
+    'small': {'base_size': 640, 'image_size': 640, 'crop_mode': False, 'description': '标准处理（640px）'},
+    'base': {'base_size': 1024, 'image_size': 1024, 'crop_mode': False, 'description': '高质量（1024px）'},
+    'large': {'base_size': 1280, 'image_size': 1280, 'crop_mode': False, 'description': '超高质量（1280px）'},
+    'gundam': {'base_size': 1024, 'image_size': 640, 'crop_mode': True, 'description': '推荐模式（智能裁剪）'}
+}
+
+# =============================================================================
+# 模型加载
+# =============================================================================
+
+def load_model():
+    """加载 DeepSeek-OCR 模型（按需加载，空闲自动释放）"""
+    global ocr_model, ocr_tokenizer
+    import torch
+    
+    with _model_lock:
+        if ocr_model is None:
+            try:
+                import urllib.request
+                urllib.request.urlopen(
+                    urllib.request.Request('http://127.0.0.1:11434/admin/unload', method='POST'),
+                    timeout=30,
+                ).read()
+            except Exception as exc:
+                logger.debug(f"Local LLM unload skipped: {exc}")
+        # 如果模型已加载，直接返回
+        if ocr_model is not None and ocr_tokenizer is not None:
+            _update_last_use_time()
+            return ocr_model, ocr_tokenizer
+    
+    config = get_config()
+    model_path = config['model_path']
+    
+    logger.info("=" * 70)
+    logger.info("开始加载 DeepSeek-OCR 模型...")
+    logger.info(f"模型路径: {model_path}")
+    
+    try:
+        from transformers import AutoModel, AutoTokenizer
+        
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        logger.info(f"使用设备: {device.upper()}")
+        
+        if device == 'cuda':
+            logger.info(f"GPU 设备: {torch.cuda.get_device_name(0)}")
+        
+        # 加载 tokenizer
+        logger.info("加载 Tokenizer...")
+        ocr_tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        
+        if ocr_tokenizer.pad_token is None:
+            ocr_tokenizer.pad_token = ocr_tokenizer.eos_token
+        
+        logger.info("✓ Tokenizer 加载完成")
+        
+        # 加载模型
+        logger.info("加载模型权重...")
+        if device == 'cuda':
+            try:
+                ocr_model = AutoModel.from_pretrained(
+                    model_path,
+                    _attn_implementation='flash_attention_2',
+                    trust_remote_code=True,
+                    use_safetensors=True,
+                    torch_dtype=torch.bfloat16
+                )
+                logger.info("✓ 已启用 Flash Attention 2")
+            except Exception as e:
+                logger.warning(f"Flash Attention 2 不可用: {e}")
+                ocr_model = AutoModel.from_pretrained(
+                    model_path,
+                    trust_remote_code=True,
+                    use_safetensors=True,
+                    torch_dtype=torch.bfloat16
+                )
+            ocr_model = ocr_model.eval().cuda()
+        else:
+            ocr_model = AutoModel.from_pretrained(
+                model_path,
+                trust_remote_code=True,
+                use_safetensors=True
+            )
+            ocr_model = ocr_model.eval()
+        
+        logger.info(f"OCR model loaded ({device})")
+        
+        # 更新最后使用时间并启动自动卸载线程
+        _update_last_use_time()
+        _start_auto_unload_thread()
+        
+        return ocr_model, ocr_tokenizer
+        
+    except Exception as e:
+        logger.error(f"Model load failed: {e}")
+        raise
+
+# =============================================================================
+# 工具函数
+# =============================================================================
+
+def convert_office_to_pdf(input_path: str, output_dir: str) -> str:
+    """将 Office 文档转换为 PDF"""
+    import subprocess
+
+    input_path = str(Path(input_path).resolve())
+    pdf_path = str(Path(output_dir).resolve() / f"{Path(input_path).stem}.pdf")
+    extension = Path(input_path).suffix.lower()
+
+    if os.name == 'nt':
+        import pythoncom
+        import win32com.client
+        from .office_utils import call_office
+
+        # CoInitializeEx preserves the native reference count for nested callers.
+        pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+        app = None
+        document = None
+        quit_app = True
+        try:
+            if extension in {'.doc', '.docx', '.odt'}:
+                app = win32com.client.DispatchEx('Word.Application')
+                app.Visible = False
+                app.DisplayAlerts = 0
+                document = call_office(lambda: app.Documents.Open(input_path, ReadOnly=True))
+                call_office(lambda: document.ExportAsFixedFormat(pdf_path, 17))
+            elif extension in {'.xls', '.xlsx', '.ods'}:
+                app = win32com.client.DispatchEx('Excel.Application')
+                app.Visible = False
+                app.DisplayAlerts = False
+                document = call_office(lambda: app.Workbooks.Open(input_path, ReadOnly=True))
+                call_office(lambda: document.ExportAsFixedFormat(0, pdf_path))
+            elif extension in {'.ppt', '.pptx', '.odp'}:
+                app = win32com.client.DispatchEx('PowerPoint.Application')
+                # PowerPoint may reuse its process despite DispatchEx.
+                quit_app = app.Presentations.Count == 0
+                document = call_office(lambda: app.Presentations.Open(input_path, True, False, False))
+                call_office(lambda: document.SaveAs(pdf_path, 32))
+            else:
+                raise RuntimeError(f'Unsupported Office format: {extension}')
+        finally:
+            try:
+                if document is not None:
+                    if extension in {'.ppt', '.pptx', '.odp'}:
+                        call_office(lambda: document.Close())
+                    else:
+                        call_office(lambda: document.Close(False))
+            finally:
+                try:
+                    if app is not None and quit_app:
+                        call_office(lambda: app.Quit())
+                finally:
+                    pythoncom.CoUninitialize()
+
+        if not os.path.exists(pdf_path):
+            raise RuntimeError(f"Office PDF was not generated: {pdf_path}")
+        return pdf_path
+    
+    try:
+        subprocess.run(['libreoffice', '--version'], capture_output=True, check=True, timeout=5)
+    except:
+        raise RuntimeError("LibreOffice 未安装，请安装: sudo apt-get install libreoffice")
+    
+    cmd = ['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', output_dir, input_path]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    
+    if result.returncode != 0:
+        raise RuntimeError(f"LibreOffice 转换失败: {result.stderr}")
+    
+    pdf_path = os.path.join(output_dir, f"{Path(input_path).stem}.pdf")
+    if not os.path.exists(pdf_path):
+        raise RuntimeError(f"PDF 文件未生成: {pdf_path}")
+    
+    return pdf_path
+
+def convert_pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 300) -> List[str]:
+    """将 PDF 转换为图片列表"""
+    if not PDF_SUPPORT:
+        raise RuntimeError("PDF 支持未启用，请安装: sudo apt-get install poppler-utils && pip install pdf2image")
+    
+    from config import POPPLER_BIN
+    poppler_path = str(POPPLER_BIN) if POPPLER_BIN.joinpath('pdftoppm.exe').exists() else None
+    images = convert_from_path(pdf_path, dpi=dpi, poppler_path=poppler_path)
+    image_paths = []
+    pdf_name = Path(pdf_path).stem
+    
+    for i, image in enumerate(images, 1):
+        image_path = os.path.join(output_dir, f"{pdf_name}_page_{i:03d}.png")
+        image.save(image_path, 'PNG')
+        image_paths.append(image_path)
+    
+    return image_paths
+
+def cleanup_files(files: List[str], dirs: List[str] = None):
+    """清理文件和目录"""
+    import shutil
+    for f in files:
+        try:
+            if os.path.exists(f):
+                os.remove(f)
+        except:
+            pass
+    if dirs:
+        for d in dirs:
+            try:
+                if os.path.exists(d):
+                    shutil.rmtree(d)
+            except:
+                pass
+
+# =============================================================================
+# 自定义流式 Streamer
+# =============================================================================
+
+# =============================================================================
+# OCR 处理函数
+# =============================================================================
+
+def process_image(
+    image_path: str,
+    function_type: str,
+    resolution_mode: str = 'gundam',
+    custom_question: str = '',
+    save_results: bool = False,
+    output_dir: Optional[str] = None,
+    stream_callback=None,
+    history_messages: Optional[list] = None,
+    stop_flag: Optional[dict] = None
+) -> str:
+    """处理单张图片"""
+    config = get_config()
+    model, tokenizer = load_model()
+    
+    if function_type not in OCR_FUNCTIONS:
+        raise ValueError(f"不支持的功能类型: {function_type}")
+    
+    function_config = OCR_FUNCTIONS[function_type]
+    prompt_template = function_config['prompt_template']
+    
+    # 构建 prompt（包含历史消息）
+    if history_messages and len(history_messages) > 0:
+        context_parts = ["以下是之前的对话记录："]
+        for msg in history_messages:
+            role = msg.get('role', 'user')
+            content = msg.get('content', '').strip()
+            if content:
+                if role == 'user':
+                    context_parts.append(f"Q: {content}")
+                elif role == 'assistant':
+                    if len(content) > 500:
+                        content = content[:500] + "..."
+                    context_parts.append(f"A: {content}")
+        
+        context_text = '\n'.join(context_parts)
+        current_question = custom_question if custom_question else "请继续回答"
+        
+        if function_config['supports_custom_question']:
+            prompt = f"{context_text}\n\n当前问题：\nQ: {current_question}\nA: "
+        else:
+            prompt = prompt_template
+    else:
+        if function_config['supports_custom_question'] and custom_question:
+            prompt = prompt_template.format(question=custom_question)
+        else:
+            prompt = prompt_template
+    
+    if resolution_mode not in RESOLUTION_MODES:
+        raise ValueError(f"不支持的分辨率模式: {resolution_mode}")
+    
+    res_config = RESOLUTION_MODES[resolution_mode]
+    
+    if output_dir is None:
+        output_dir = os.path.join(config['output_folder'], datetime.now().strftime('%Y%m%d_%H%M%S'))
+    os.makedirs(output_dir, exist_ok=True)
+    
+    import torch
+    from .ocr_inference import infer_with_streamer
+    custom_streamer = None
+    if stream_callback:
+        from .ocr_streamer import CallbackTextStreamer
+        custom_streamer = CallbackTextStreamer(tokenizer, callback=stream_callback, skip_prompt=True)
+    # Prevent parallel generation and idle unload while the model is in use.
+    with _model_lock:
+        result = infer_with_streamer(
+            model, tokenizer, streamer=custom_streamer, stop_flag=stop_flag,
+            prompt=prompt, image_file=image_path, output_path=output_dir,
+            base_size=res_config['base_size'], image_size=res_config['image_size'],
+            crop_mode=res_config['crop_mode'], save_results=save_results,
+            test_compress=False, eval_mode=True,
+        )
+        _update_last_use_time()
+    
+    if result is None:
+        result = ""
+
+    
+    # 检测重复内容
+    if result and len(result) > 1000:
+        words = result.split()
+        unique_words = set(words)
+        if len(unique_words) < len(words) * 0.15:
+            result = result[:500] + "\n\n[检测到重复内容，已自动截断]"
+    
+    # 更新最后使用时间（重置空闲计时器）
+    _update_last_use_time()
+    
+    # 清理 CUDA 缓存
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()
+    
+    return result
+
+# =============================================================================
+# API 路由
+# =============================================================================
+
+@ocr_bp.route('/unload', methods=['POST'])
+def unload_model_endpoint():
+    """卸载模型，释放显存"""
+    try:
+        success = unload_model()
+        if success:
+            import torch
+            # 获取释放后的显存状态
+            gpu_info = None
+            if torch.cuda.is_available():
+                gpu_info = {
+                    'memory_allocated': f"{torch.cuda.memory_allocated(0) / 1024**3:.2f} GB",
+                    'memory_reserved': f"{torch.cuda.memory_reserved(0) / 1024**3:.2f} GB"
+                }
+            return jsonify({
+                'success': True,
+                'message': '模型已卸载，显存已释放',
+                'gpu_info': gpu_info
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'message': '模型未加载，无需卸载'
+            })
+    except Exception as e:
+        logger.error(f"Unload failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ocr_bp.route('/health', methods=['GET'])
+def health_check():
+    """健康检查"""
+    try:
+        config = get_config()
+        torch = sys.modules.get('torch')
+        ready = torch is not None and not getattr(torch.__spec__, '_initializing', False)
+        device = ('cuda' if torch.cuda.is_available() else 'cpu') if ready else 'not_initialized'
+        gpu_info = None
+        
+        if device == 'cuda':
+            gpu_info = {
+                'name': torch.cuda.get_device_name(0),
+                'memory_total': f"{torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB",
+                'memory_allocated': f"{torch.cuda.memory_allocated(0) / 1024**3:.2f} GB"
+            }
+        
+        # 自动卸载状态
+        auto_unload_info = {
+            'enabled': True,
+            'timeout_seconds': config['auto_unload_timeout'],
+            'check_interval_seconds': config['auto_unload_check_interval']
+        }
+        if ocr_model is not None and _last_use_time > 0:
+            idle_seconds = int(time.time() - _last_use_time)
+            auto_unload_info['idle_seconds'] = idle_seconds
+            auto_unload_info['will_unload_in'] = max(0, config['auto_unload_timeout'] - idle_seconds)
+        
+        return jsonify({
+            'status': 'ok',
+            'service': 'DeepSeek-OCR',
+            'model_loaded': ocr_model is not None,
+            'device': device,
+            'gpu_info': gpu_info,
+            'pdf_support': PDF_SUPPORT,
+            'model_path': config['model_path'],
+            'auto_unload': auto_unload_info
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+@ocr_bp.route('/functions', methods=['GET'])
+def list_functions():
+    """列出所有可用功能"""
+    return jsonify({
+        'functions': [
+            {
+                'id': key,
+                'name': value['name'],
+                'description': value['description'],
+                'supports_custom_question': value['supports_custom_question']
+            }
+            for key, value in OCR_FUNCTIONS.items()
+        ]
+    })
+
+@ocr_bp.route('/resolutions', methods=['GET'])
+def list_resolutions():
+    """列出所有分辨率模式"""
+    return jsonify({
+        'modes': [
+            {
+                'id': key,
+                'description': value['description'],
+                'config': {'base_size': value['base_size'], 'image_size': value['image_size'], 'crop_mode': value['crop_mode']}
+            }
+            for key, value in RESOLUTION_MODES.items()
+        ],
+        'recommended': 'gundam'
+    })
+
+@ocr_bp.route('/upload', methods=['POST'])
+def upload_file():
+    """仅上传文件"""
+    try:
+        config = get_config()
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': '未上传文件'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': '文件名为空'}), 400
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{file.filename}"
+        upload_path = os.path.join(config['upload_folder'], filename)
+        file.save(upload_path)
+        
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'path': upload_path,
+            'originalName': file.filename,
+            'size': os.path.getsize(upload_path)
+        })
+    except Exception as e:
+        logger.error(f"Upload failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ocr_bp.route('/process', methods=['POST'])
+def process_file():
+    """处理文件（图片或 PDF）"""
+    config = get_config()
+    dirs_to_cleanup = []
+    
+    try:
+        function_type = request.form.get('function', 'free_ocr')
+        resolution_mode = request.form.get('resolution', 'gundam')
+        custom_question = request.form.get('question', '')
+        save_results = request.form.get('save_results', 'false').lower() == 'true'
+        uploaded_filename = request.form.get('uploaded_filename', '')
+        
+        # 历史消息
+        history_messages = []
+        messages_json = request.form.get('messages', '')
+        if messages_json:
+            try:
+                history_messages = json.loads(messages_json)
+            except:
+                pass
+        
+        # 处理文件
+        if uploaded_filename:
+            upload_path = os.path.join(config['upload_folder'], uploaded_filename)
+            if not os.path.exists(upload_path):
+                return jsonify({'success': False, 'error': '文件不存在'}), 400
+            filename = uploaded_filename
+            parts = filename.split('_', 2)
+            original_filename = parts[2] if len(parts) >= 3 else filename
+        else:
+            if 'file' not in request.files:
+                return jsonify({'error': '未上传文件'}), 400
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': '文件名为空'}), 400
+            original_filename = file.filename
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{file.filename}"
+            upload_path = os.path.join(config['upload_folder'], filename)
+            file.save(upload_path)
+        
+        if function_type not in OCR_FUNCTIONS:
+            return jsonify({'error': f'不支持的功能: {function_type}'}), 400
+        if resolution_mode not in RESOLUTION_MODES:
+            return jsonify({'error': f'不支持的分辨率: {resolution_mode}'}), 400
+        
+        try:
+            file_ext = Path(filename).suffix.lower()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_dir = os.path.join(config['output_folder'], timestamp)
+            os.makedirs(output_dir, exist_ok=True)
+            dirs_to_cleanup.append(output_dir)
+            
+            office_extensions = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.odt', '.ods', '.odp']
+            files_to_process = []
+            
+            if file_ext in office_extensions:
+                pdf_path = convert_office_to_pdf(upload_path, output_dir)
+                files_to_process = convert_pdf_to_images(pdf_path, output_dir)
+            elif file_ext == '.pdf':
+                if not PDF_SUPPORT:
+                    return jsonify({'error': 'PDF 支持未启用'}), 400
+                files_to_process = convert_pdf_to_images(upload_path, output_dir)
+            else:
+                files_to_process = [upload_path]
+            
+            results = []
+            for idx, image_path in enumerate(files_to_process, 1):
+                result = process_image(
+                    image_path=image_path,
+                    function_type=function_type,
+                    resolution_mode=resolution_mode,
+                    custom_question=custom_question,
+                    save_results=save_results,
+                    output_dir=output_dir,
+                    history_messages=history_messages
+                )
+                results.append(result)
+            
+            final_text = "\n\n".join(results)
+            
+            return jsonify({
+                'success': True,
+                'text': final_text,
+                'metadata': {
+                    'filename': original_filename,
+                    'function': function_type,
+                    'function_name': OCR_FUNCTIONS[function_type]['name'],
+                    'resolution': resolution_mode,
+                    'is_pdf': file_ext == '.pdf',
+                    'pages': len(files_to_process)
+                }
+            })
+        finally:
+            if dirs_to_cleanup:
+                cleanup_files([], dirs_to_cleanup)
+    
+    except Exception as e:
+        logger.error(f"Process failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@ocr_bp.route('/process/stream', methods=['POST'])
+def process_file_stream():
+    """流式处理文件（SSE）"""
+    config = get_config()
+    
+    def generate():
+        dirs_to_cleanup = []
+        
+        try:
+            function_type = request.form.get('function', 'free_ocr')
+            resolution_mode = request.form.get('resolution', 'gundam')
+            custom_question = request.form.get('question', '')
+            uploaded_filename = request.form.get('uploaded_filename', '')
+            
+            history_messages = []
+            messages_json = request.form.get('messages', '')
+            if messages_json:
+                try:
+                    history_messages = json.loads(messages_json)
+                except:
+                    pass
+            
+            yield f"data: {json.dumps({'type': 'start', 'message': '开始处理...'})}\n\n"
+            
+            # 处理文件
+            if uploaded_filename:
+                upload_path = os.path.join(config['upload_folder'], uploaded_filename)
+                if not os.path.exists(upload_path):
+                    yield f"data: {json.dumps({'error': '文件不存在'})}\n\n"
+                    return
+                filename = uploaded_filename
+                parts = filename.split('_', 2)
+                original_filename = parts[2] if len(parts) >= 3 else filename
+            else:
+                if 'file' not in request.files:
+                    yield f"data: {json.dumps({'error': '未上传文件'})}\n\n"
+                    return
+                file = request.files['file']
+                if file.filename == '':
+                    yield f"data: {json.dumps({'error': '文件名为空'})}\n\n"
+                    return
+                original_filename = file.filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{timestamp}_{file.filename}"
+                upload_path = os.path.join(config['upload_folder'], filename)
+                file.save(upload_path)
+            
+            yield f"data: {json.dumps({'type': 'progress', 'stage': '文件已准备', 'progress': 10})}\n\n"
+            
+            file_ext = Path(filename).suffix.lower()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_dir = os.path.join(config['output_folder'], timestamp)
+            os.makedirs(output_dir, exist_ok=True)
+            dirs_to_cleanup.append(output_dir)
+            
+            office_extensions = ['.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt']
+            files_to_process = []
+            
+            if file_ext in office_extensions:
+                yield f"data: {json.dumps({'type': 'progress', 'stage': '转换文档...', 'progress': 15})}\n\n"
+                pdf_path = convert_office_to_pdf(upload_path, output_dir)
+                files_to_process = convert_pdf_to_images(pdf_path, output_dir)
+            elif file_ext == '.pdf':
+                yield f"data: {json.dumps({'type': 'progress', 'stage': '转换PDF...', 'progress': 20})}\n\n"
+                files_to_process = convert_pdf_to_images(upload_path, output_dir)
+            else:
+                files_to_process = [upload_path]
+            
+            yield f"data: {json.dumps({'type': 'progress', 'stage': '加载模型...', 'progress': 40})}\n\n"
+            load_model()
+            
+            all_results = []
+            stop_flag = {'stop': False}
+            
+            for idx, image_path in enumerate(files_to_process, 1):
+                if stop_flag['stop']:
+                    break
+                
+                progress = 40 + int((idx / len(files_to_process)) * 50)
+                yield f"data: {json.dumps({'type': 'progress', 'stage': f'处理第{idx}/{len(files_to_process)}页...', 'progress': progress})}\n\n"
+                
+                text_queue = queue.Queue()
+                result_container = {'result': None, 'error': None}
+                
+                def stream_callback(text_chunk):
+                    if not stop_flag['stop']:
+                        text_queue.put(('content', text_chunk))
+                
+                def run_inference():
+                    try:
+                        result = process_image(
+                            image_path=image_path,
+                            function_type=function_type,
+                            resolution_mode=resolution_mode,
+                            custom_question=custom_question,
+                            save_results=False,
+                            output_dir=output_dir,
+                            stream_callback=stream_callback,
+                            history_messages=history_messages,
+                            stop_flag=stop_flag
+                        )
+                        if not stop_flag['stop']:
+                            result_container['result'] = result
+                            text_queue.put(('done', None))
+                    except Exception as e:
+                        if not stop_flag['stop']:
+                            result_container['error'] = str(e)
+                            text_queue.put(('error', str(e)))
+                
+                inference_thread = threading.Thread(target=run_inference, daemon=True)
+                inference_thread.start()
+                
+                while True:
+                    try:
+                        msg_type, data = text_queue.get(timeout=0.1)
+                        if msg_type == 'content':
+                            yield f"data: {json.dumps({'type': 'content', 'text': data})}\n\n"
+                        elif msg_type == 'done':
+                            break
+                        elif msg_type == 'error':
+                            yield f"data: {json.dumps({'type': 'error', 'error': data})}\n\n"
+                            break
+                    except queue.Empty:
+                        if not inference_thread.is_alive() and text_queue.empty():
+                            break
+                
+                inference_thread.join(timeout=1.0)
+                if result_container['result']:
+                    all_results.append(result_container['result'])
+                
+                if len(files_to_process) > 1 and idx < len(files_to_process):
+                    separator = '\n\n'
+                    yield f"data: {json.dumps({'type': 'content', 'text': separator})}\n\n"
+            
+            if not stop_flag['stop']:
+                metadata = {
+                    'filename': original_filename,
+                    'function': function_type,
+                    'function_name': OCR_FUNCTIONS[function_type]['name'],
+                    'resolution': resolution_mode,
+                    'pages': len(files_to_process)
+                }
+                yield f"data: {json.dumps({'type': 'done', 'metadata': metadata})}\n\n"
+        
+        except Exception as e:
+            logger.error(f"Stream failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        finally:
+            if dirs_to_cleanup:
+                cleanup_files([], dirs_to_cleanup)
+    
+    response = Response(stream_with_context(generate()), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
+
+# =============================================================================
+# 模块初始化
+# =============================================================================
+
+def init_ocr_service(preload_model: bool = False):
+    """初始化 OCR 服务"""
+    config = get_config()
+    os.makedirs(config['upload_folder'], exist_ok=True)
+    os.makedirs(config['output_folder'], exist_ok=True)
+    
+    if preload_model:
+        try:
+            load_model()
+        except Exception as e:
+            logger.warning(f"OCR preload failed: {e}")

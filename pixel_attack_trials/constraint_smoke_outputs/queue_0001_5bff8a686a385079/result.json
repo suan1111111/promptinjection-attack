@@ -1,0 +1,33 @@
+{
+  "completed_steps": 1,
+  "questions_per_step": 1,
+  "max_abs_delta_255": 2.9455259442329407,
+  "mean_abs_delta_255": 0.46711885021068156,
+  "final_image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\constraint_smoke_outputs\\queue_0001_5bff8a686a385079\\adversarial_final.png",
+  "constraint": {
+    "implementation_version": 1,
+    "kind": "lowfreq",
+    "frequency_ratio": 0.125,
+    "coefficient_shape": [
+      1,
+      3,
+      28,
+      28
+    ],
+    "frequency_claim": "Strictly truncated latent DCT; clipped/quantized image may leak high frequencies"
+  },
+  "before_png": {
+    "changed_pixel_locations": 50176,
+    "max_change_from_source_255": 2.9455259442329407,
+    "max_change_from_reference_255": 2.9455259442329407,
+    "outside_retained_DCT_energy_fraction": 5.197950750379654e-11
+  },
+  "saved_png": {
+    "changed_pixel_locations": 39050,
+    "max_change_from_source_255": 2.9999998211860657,
+    "max_change_from_reference_255": 2.9999998211860657,
+    "outside_retained_DCT_energy_fraction": 0.1778436303138733
+  },
+  "behavioral_success": "unassessed; inspect held-out generation and task preservation",
+  "evaluation_performed": true
+}

@@ -1,0 +1,4 @@
+# Isolated overlay; share other dependencies from .venv via setup-ocr-runtime.ps1.
+# Official DeepSeek-OCR requires the legacy Llama attention interfaces.
+transformers==4.46.3
+tokenizers==0.20.3

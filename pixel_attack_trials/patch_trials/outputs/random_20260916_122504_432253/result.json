@@ -1,0 +1,14 @@
+{
+  "completed_steps": 1,
+  "gradient_check_only": true,
+  "evaluation_performed": false,
+  "final_loss_before_update": 2.6242055892944336,
+  "last_grad_max": 0.02668655663728714,
+  "outside_max_diff": 0.0,
+  "peak_allocated_gib": 5.344958305358887,
+  "preview_xy": [
+    504,
+    0
+  ],
+  "patch_file": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\patch_trials\\outputs\\random_20260916_122504_432253\\patch_final.png"
+}

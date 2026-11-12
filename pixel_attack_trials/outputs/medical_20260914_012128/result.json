@@ -1,0 +1,5 @@
+{
+  "max_abs_delta_255": 8.00000712275505,
+  "mean_abs_delta_255": 4.022706393152475,
+  "final_image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\outputs\\medical_20260914_012128\\adversarial_final.png"
+}

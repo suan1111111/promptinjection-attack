@@ -1,0 +1,10 @@
+[
+  {
+    "id": "medical-page-09-demo",
+    "image": "../picture/medical-page-09.png",
+    "question": "请简短描述图片中的内容。",
+    "label": null,
+    "dataset": null,
+    "split": "unassigned"
+  }
+]

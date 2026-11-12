@@ -1,0 +1,233 @@
+{
+    "name": "China PIPL",
+    "value": 1,
+    "children": [
+      {
+        "name": "General Personal Information",
+        "value": 1,
+        "children": [
+          {
+            "name": "Identity & Basic Attributes",
+            "value": 1,
+            "children": [
+              { "name": "Name", "value": 1 },
+              { "name": "Former name/alias", "value": 1 },
+              { "name": "Gender", "value": 1 },
+              { "name": "Date of birth/age", "value": 1 },
+              { "name": "Nationality/region", "value": 1 },
+              { "name": "Ethnicity", "value": 1 },
+              { "name": "Avatar/photo (non-ID purposes)", "value": 1 },
+              { "name": "Household registration info", "value": 1 }
+            ]
+          },
+          {
+            "name": "Contact Info & Communication Accounts",
+            "value": 1,
+            "children": [
+              { "name": "Mobile phone number", "value": 1 },
+              { "name": "Landline phone", "value": 1 },
+              { "name": "Email address", "value": 1 },
+              { "name": "Mailing address/postal code", "value": 1 },
+              { "name": "Fax number", "value": 1 },
+              { "name": "IM accounts (WeChat/QQ/Skype)", "value": 1 },
+              { "name": "Social media account/ID", "value": 1 },
+              { "name": "Emergency contact info", "value": 1 }
+            ]
+          },
+          {
+            "name": "Device & Network Identifiers",
+            "value": 1,
+            "children": [
+              { "name": "Device model/brand", "value": 1 },
+              { "name": "OS/version", "value": 1 },
+              { "name": "Browser UA/version", "value": 1 },
+              { "name": "Screen resolution/language/timezone", "value": 1 },
+              { "name": "IP address (& coarse location)", "value": 1 },
+              { "name": "Cookie/session/ETag", "value": 1 },
+              { "name": "Advertising ID (IDFA/AAID)", "value": 1 },
+              { "name": "Device serial/Android ID", "value": 1 },
+              { "name": "IMEI/IMSI/ICCID", "value": 1 },
+              { "name": "MAC address", "value": 1 },
+              { "name": "Carrier/network type", "value": 1 }
+            ]
+          },
+          {
+            "name": "Online Behavior & Logs",
+            "value": 1,
+            "children": [
+              { "name": "Browsing history/dwell time", "value": 1 },
+              { "name": "Search keywords", "value": 1 },
+              { "name": "Clickstream/referral URL", "value": 1 },
+              { "name": "Download/upload records", "value": 1 },
+              { "name": "App usage duration/feature use", "value": 1 },
+              { "name": "Crash/error/diagnostic logs", "value": 1 },
+              { "name": "Ad impression/click/conversion records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Content & Interaction",
+            "value": 1,
+            "children": [
+              { "name": "Text content (posts/comments/messages)", "value": 1 },
+              { "name": "Images/videos/audio (non-biometric)", "value": 1 },
+              { "name": "Likes/favorites/follows/shares", "value": 1 },
+              { "name": "Group/community participation", "value": 1 }
+            ]
+          },
+          {
+            "name": "Education & Career",
+            "value": 1,
+            "children": [
+              { "name": "Education level/degree", "value": 1 },
+              { "name": "School/major/enrollment/graduation dates", "value": 1 },
+              { "name": "Qualifications/professional licenses", "value": 1 },
+              { "name": "Employer/department/position/rank", "value": 1 },
+              { "name": "Work location/employee ID", "value": 1 },
+              { "name": "Resume/interview/assessment results", "value": 1 }
+            ]
+          },
+          {
+            "name": "Property, Transactions & Orders",
+            "value": 1,
+            "children": [
+              { "name": "Order number/product/service info", "value": 1 },
+              { "name": "Transaction amount/currency/time", "value": 1 },
+              { "name": "Payment method (no account/password)", "value": 1 },
+              { "name": "Invoice/tax info", "value": 1 },
+              { "name": "Recipient name/phone/address", "value": 1 },
+              { "name": "Tracking number/delivery records", "value": 1 },
+              { "name": "After-sales/refund/dispute records", "value": 1 },
+              { "name": "Membership level/points/coupons", "value": 1 }
+            ]
+          },
+          {
+            "name": "Assets & Property",
+            "value": 1,
+            "children": [
+              { "name": "Vehicle info (plate/VIN/model)", "value": 1 },
+              { "name": "Property info (address/area/purpose)", "value": 1 },
+              { "name": "Insurance policy (non-health/credentials)", "value": 1 }
+            ]
+          },
+          {
+            "name": "Family & Social Relations",
+            "value": 1,
+            "children": [
+              { "name": "Marital status/spouse info", "value": 1 },
+              { "name": "Children/parents info", "value": 1 },
+              { "name": "Relatives/guardian/emergency contact relations", "value": 1 }
+            ]
+          },
+          {
+            "name": "Government & Tax Affairs",
+            "value": 1,
+            "children": [
+              { "name": "Residence permit/registration info", "value": 1 },
+              { "name": "General tax info (no account/credentials)", "value": 1 },
+              { "name": "Social insurance type & payment range", "value": 1 }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Sensitive Personal Information",
+        "value": 1,
+        "children": [
+          {
+            "name": "Biometric Identification",
+            "value": 1,
+            "children": [
+              { "name": "Face template/3D face/liveness detection", "value": 1 },
+              { "name": "Fingerprint/palmprint/palm vein", "value": 1 },
+              { "name": "Iris/retina", "value": 1 },
+              { "name": "Voiceprint", "value": 1 },
+              { "name": "Gait/ear/gesture recognition templates", "value": 1 },
+              { "name": "DNA/genetic identifier", "value": 1 }
+            ]
+          },
+          {
+            "name": "Medical & Health",
+            "value": 1,
+            "children": [
+              { "name": "Medical records/diagnosis/treatment/prescriptions", "value": 1 },
+              { "name": "Physical exam/lab tests/imaging reports", "value": 1 },
+              { "name": "Disability info/medical history/surgery history", "value": 1 },
+              { "name": "Vital signs (heart rate/BP/glucose/sleep/steps)", "value": 1 },
+              { "name": "Genetic/family medical history", "value": 1 },
+              { "name": "Health code/vaccination records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Financial Accounts & Payment Credentials",
+            "value": 1,
+            "children": [
+              { "name": "Bank account number/branch", "value": 1 },
+              { "name": "Payment account (third-party payment ID)", "value": 1 },
+              { "name": "Card number/expiration/CVV", "value": 1 },
+              { "name": "Transaction auth factors (SMS code/OTP)", "value": 1 },
+              { "name": "Payment password/e-wallet key/token", "value": 1 },
+              { "name": "Bank-registered mobile number", "value": 1 }
+            ]
+          },
+          {
+            "name": "Whereabouts & Precise Location",
+            "value": 1,
+            "children": [
+              { "name": "Real-time GPS coordinates", "value": 1 },
+              { "name": "Historical location trajectory/itinerary", "value": 1 },
+              { "name": "Access records (gate/turnstile/check-in)", "value": 1 },
+              { "name": "Ride-hailing/flight/transit itinerary", "value": 1 },
+              { "name": "Wi-Fi/Bluetooth nearby device scan records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Religious Beliefs",
+            "value": 1,
+            "children": [
+              { "name": "Religious belief category", "value": 1 },
+              { "name": "Religious activity participation records", "value": 1 }
+            ]
+          },
+          {
+            "name": "Specific Identity Info (High Risk)",
+            "value": 1,
+            "children": [
+              { "name": "Government-issued ID numbers (ID card/passport/military)", "value": 1 },
+              { "name": "Social security/health insurance/provident fund account", "value": 1 },
+              { "name": "Taxpayer ID/personal tax account", "value": 1 }
+            ]
+          },
+          {
+            "name": "Minors Under 14 ",
+            "value": 1,
+            "children": [
+              { "name": "Child identity (name/ID documents)", "value": 1 },
+              { "name": "Guardian info (name/relationship/contact)", "value": 1 },
+              { "name": "School info (school/class/student ID)", "value": 1 },
+              { "name": "Internet usage & device info", "value": 1 },
+              { "name": "Location safety & pick-up/drop-off itinerary", "value": 1 },
+              { "name": "Photos/videos/works & assessments", "value": 1 }
+            ]
+          },
+          {
+            "name": "Criminal & Judicial Records",
+            "value": 1,
+            "children": [
+              { "name": "Criminal conviction/suspicion/investigation records", "value": 1 },
+              { "name": "Administrative penalties/dishonesty records", "value": 1 },
+              { "name": "Litigation/arbitration/judgment info", "value": 1 }
+            ]
+          },
+          {
+            "name": "Account Auth & Communication Contents",
+            "value": 1,
+            "children": [
+              { "name": "Account passwords/security Q&A/keys/tokens", "value": 1 },
+              { "name": "Call recordings/chat content/email body", "value": 1 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  

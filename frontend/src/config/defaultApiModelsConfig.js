@@ -1,0 +1,122 @@
+/**
+ * 内置 API 模型配置文件
+ * 用于统一管理所有自定义 API 模型
+ * 
+ * 配置格式：
+ * {
+ *   'model-id': {
+ *     url: 'API基础地址（不包含 /chat/completions）',
+ *     model: '实际调用 API 时使用的模型 ID',
+ *     apikey: 'API密钥',
+ *     description: '模型描述'
+ *   }
+ * }
+ */
+
+export const DEFAULT_API_MODELS = {
+  // DeepSeek Chat 模型
+  'deepseek-chat': {
+    url: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+    apikey: import.meta.env.VITE_DEEPSEEK_API_KEY || '',
+    description: 'DeepSeek Chat - 通用对话和推理',
+    contextLength: 32768
+  },
+  
+  // DeepSeek OCR 模型（本地部署）
+  // 注意：需要先启动 PrivaSee 统一后端服务（端口 5000）
+  // 运行: cd backend && bash start.sh
+  // 使用相对路径 /ocr-api，通过 Vite 代理访问后端 OCR 服务
+  'deepseek-ocr': {
+    url: import.meta.env.VITE_DEEPSEEK_OCR_URL || '/ocr-api',
+    model: 'deepseek-ai/DeepSeek-OCR',
+    apikey: '',
+    description: 'DeepSeek OCR 本地部署 （支持多种文档处理功能）',
+    contextLength: 32768,
+    capabilities: ['ocr', 'markdown', 'table', 'formula', 'visual_qa']
+  },
+
+  // ========== DeepSeek OCR API 版本已禁用，只使用本地版本 ==========
+  // 'deepseek-ocr': {
+  //   url: 'https://api.siliconflow.cn/v1',
+  //   model: 'Qwen/Qwen2-VL-7B-Instruct',
+  //   apikey: '',
+  //   description: 'DeepSeek OCR （基于 Qwen2-VL，支持文档处理）',
+  //   contextLength: 32768,
+  //   capabilities: ['ocr', 'markdown', 'table', 'formula', 'visual_qa']
+  // },
+  
+  // Qwen Flash 模型
+  'qwen-flash': {
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-turbo-latest',
+    apikey: import.meta.env.VITE_DASHSCOPE_API_KEY || '',
+    description: 'Qwen Flash - 快速响应模型',
+    contextLength: 131072
+  },
+  
+  // Qwen3 VL 8B 模型
+  'qwen3-vl-8b-instruct': {
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-vl-max-latest',
+    apikey: import.meta.env.VITE_DASHSCOPE_API_KEY || '',
+    description: 'Qwen3 VL 8B - 视觉语言模型',
+    contextLength: 32768
+  },
+  
+  // Qwen 2.5 Omni 7B 模型
+  'qwen2.5-omni-7b': {
+    url: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen2.5-omni-7b-instruct',
+    apikey: import.meta.env.VITE_DASHSCOPE_API_KEY || '',
+    description: 'Qwen 2.5 Omni 7B - 多模态模型',
+    contextLength: 32768
+  },
+}
+
+/**
+ * 获取所有内置 API 模型配置（转换为 customProviders 格式）
+ * @returns {Object} API 模型配置对象，格式：{ modelId: { baseUrl, apiKey, modelId, description, contextLength } }
+ */
+export const getDefaultApiModels = () => {
+  const result = {}
+
+  Object.entries(DEFAULT_API_MODELS).forEach(([id, config]) => {
+    result[id] = {
+      baseUrl: config.url,
+      apiKey: config.apikey,
+      modelId: config.model,
+      description: config.description,
+      contextLength: config.contextLength
+    }
+  })
+
+  return result
+}
+
+/**
+ * 获取特定模型的配置
+ * @param {string} modelId - 模型 ID
+ * @returns {Object|null} 模型配置或 null
+ */
+export const getApiModelConfig = (modelId) => {
+  const config = DEFAULT_API_MODELS[modelId]
+  if (!config) return null
+
+  return {
+    baseUrl: config.url,
+    apiKey: config.apikey,
+    modelId: config.model,
+    description: config.description,
+    contextLength: config.contextLength
+  }
+}
+
+/**
+ * 获取所有内置 API 模型的 ID 列表
+ * @returns {string[]} 模型 ID 数组
+ */
+export const getDefaultApiModelIds = () => {
+  return Object.keys(DEFAULT_API_MODELS)
+}
+

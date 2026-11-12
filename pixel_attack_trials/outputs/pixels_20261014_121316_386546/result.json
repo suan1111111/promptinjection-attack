@@ -1,0 +1,8 @@
+{
+  "completed_steps": 2,
+  "questions_per_step": 2,
+  "max_abs_delta_255": 8.00000712275505,
+  "mean_abs_delta_255": 2.9388314159587026,
+  "final_image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\outputs\\pixels_20261014_121316_386546\\adversarial_final.png",
+  "evaluation_performed": true
+}

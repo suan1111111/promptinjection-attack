@@ -1,0 +1,21 @@
+{
+  "research_notice": "Controlled red-team experiment; outputs are not medical diagnoses.",
+  "source_image": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\medical_clean.png",
+  "source_csv": "D:\\CodexProjects\\PrivaSee\\pixel_attack_trials\\medical_healthy_bias.csv",
+  "model_dir": "D:\\CodexProjects\\PrivaSee\\models\\qwen2.5-vl-3b-instruct",
+  "original_size": [
+    2000,
+    1278
+  ],
+  "training_size": [
+    560,
+    336
+  ],
+  "train_rows": 5,
+  "target_mode": "short",
+  "steps": 50,
+  "epsilon_255": 8.0,
+  "alpha_255": 1.0,
+  "max_visual_tokens": 256,
+  "seed": 7
+}
