@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 import subprocess
 import tarfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -102,7 +103,7 @@ def pack():
     (WORK / 'source-files.json').write_text(json.dumps(source, ensure_ascii=False, indent=2), encoding='utf-8')
     (WORK / 'asset-files.json').write_text(json.dumps(assets, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'Packing {len(assets)} assets ({total / 1024**3:.2f} GiB); {len(source)} source files', flush=True)
-    writer = SplitWriter(1024**3)
+    writer = SplitWriter(128 * 1024**2)
     with tarfile.open(fileobj=writer, mode='w|', dereference=True) as tar:
         for name in assets:
             tar.add(ROOT / name, arcname=name, recursive=False)
@@ -128,13 +129,29 @@ def request(url, token=None, method='GET', data=None, headers=None, timeout=60):
     if token:
         h['Authorization'] = 'Bearer ' + token
     h.update(headers or {})
-    opener = (urllib.request.build_opener(urllib.request.ProxyHandler({}))
-              if os.environ.get('GITHUB_SYNC_DIRECT') == '1' else urllib.request.build_opener())
-    return opener.open(urllib.request.Request(url, data=data, headers=h, method=method), timeout=timeout)
+    attempts = 3 if method in {'GET', 'DELETE', 'PATCH'} else 1
+    for attempt in range(attempts):
+        direct = os.environ.get('GITHUB_SYNC_DIRECT') == '1' and attempt < 2
+        opener = (urllib.request.build_opener(urllib.request.ProxyHandler({})) if direct
+                  else urllib.request.build_opener())
+        try:
+            return opener.open(urllib.request.Request(url, data=data, headers=h, method=method), timeout=timeout)
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            if isinstance(error, urllib.error.HTTPError) and error.code not in {429, 500, 502, 503, 504}:
+                raise
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(2 * (attempt + 1))
 
 
 def part_groups(manifest):
-    return [manifest['parts']] + [x['parts'] for x in manifest.get('overlays', [])]
+    groups = [manifest['parts']] + [x['parts'] for x in manifest.get('overlays', [])]
+    for group in groups:
+        for part in group:
+            name = part['name']
+            if not name or name in {'.', '..'} or '/' in name or '\\' in name:
+                raise ValueError('Unsafe part filename')
+    return groups
 
 
 class UploadReader:
@@ -151,7 +168,7 @@ class UploadReader:
         return block
 
 
-def upload(workers=4, active_part=None):
+def upload(workers=4):
     manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
     token = credentials()
     base = f'https://api.github.com/repos/{manifest["repository"]}'
@@ -182,46 +199,82 @@ def upload(workers=4, active_part=None):
             release = json.load(r)
     state_path.write_text(json.dumps({'repository': manifest['repository'], 'tag': manifest['tag'],
                                      'id': release['id']}), encoding='utf-8')
-    with request(f'{base}/releases/{release["id"]}/assets?per_page=100', token) as r:
-        existing = {x['name']: x for x in json.load(r)}
+    def remote_assets():
+        assets, page = {}, 1
+        while True:
+            with request(f'{base}/releases/{release["id"]}/assets?per_page=100&page={page}', token) as r:
+                batch = json.load(r)
+            assets.update((x['name'], x) for x in batch)
+            if len(batch) < 100:
+                return assets
+            page += 1
+
+    existing = remote_assets()
     # Validate release uploads with the small database overlay before the model volumes.
     groups = part_groups(manifest)
     parts = [p for group in groups[1:] + groups[:1] for p in group]
+    progress_lock = threading.Lock()
+
+    def record_verified(part):
+        entry = {'name': part['name'], 'size': part['size'], 'sha256': part['sha256'], 'verified_at': time.time()}
+        with progress_lock:
+            with (WORK / 'upload-progress.jsonl').open('a', encoding='utf-8') as stream:
+                stream.write(json.dumps(entry) + '\n')
 
     def upload_part(part):
         old = existing.get(part['name'])
-        if part['name'] == active_part or (active_part and old and old.get('state') != 'uploaded'):
-            print('Another worker is uploading: ' + part['name'], flush=True)
+        if old and old.get('size') == part['size'] and old.get('digest') == 'sha256:' + part['sha256']:
+            record_verified(part)
+            print('Already uploaded and verified: ' + part['name'], flush=True)
             return
-        if old:
-            if old.get('size') == part['size'] and old.get('digest') == 'sha256:' + part['sha256']:
-                print('Already uploaded and verified: ' + part['name'], flush=True)
-                return
-            if release.get('draft') and old.get('state') != 'uploaded':
-                with request(f'{base}/releases/assets/{old["id"]}', token, 'DELETE'):
-                    pass
-            else:
-                raise RuntimeError('Existing release asset differs: ' + part['name'])
         path = WORK / part['name']
         if digest(path) != part['sha256']:
             raise RuntimeError('Local package checksum mismatch: ' + part['name'])
         url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(part['name'])
-        print('Uploading ' + part['name'], flush=True)
-        with path.open('rb') as stream:
-            with request(url, token, 'POST', UploadReader(stream, part['name'], part['size']), {'Content-Type': 'application/octet-stream',
-                         'Content-Length': str(part['size'])}, timeout=1800) as r:
-                item = json.load(r)
-        if item.get('size') != part['size'] or item.get('digest') != 'sha256:' + part['sha256']:
-            raise RuntimeError('Uploaded asset failed checksum verification: ' + part['name'])
-        print('Verified ' + part['name'], flush=True)
+        for attempt in range(5):
+            if attempt:
+                old = remote_assets().get(part['name'])
+            if old:
+                if old.get('size') == part['size'] and old.get('digest') == 'sha256:' + part['sha256']:
+                    record_verified(part)
+                    print('Verified ' + part['name'], flush=True)
+                    return
+                if release.get('draft') and old.get('state') != 'uploaded':
+                    with request(f'{base}/releases/assets/{old["id"]}', token, 'DELETE'):
+                        pass
+                else:
+                    raise RuntimeError('Existing release asset differs: ' + part['name'])
+            print(f'Uploading {part["name"]} (attempt {attempt + 1}/5)', flush=True)
+            try:
+                with path.open('rb') as stream:
+                    with request(url, token, 'POST', UploadReader(stream, part['name'], part['size']),
+                                 {'Content-Type': 'application/octet-stream', 'Content-Length': str(part['size'])},
+                                 timeout=300) as r:
+                        item = json.load(r)
+                if item.get('size') != part['size'] or item.get('digest') != 'sha256:' + part['sha256']:
+                    raise RuntimeError('Uploaded asset failed checksum verification: ' + part['name'])
+                record_verified(part)
+                print('Verified ' + part['name'], flush=True)
+                return
+            except (urllib.error.URLError, TimeoutError, OSError) as error:
+                print(f'Retrying {part["name"]}: {type(error).__name__}', flush=True)
+                if attempt == 4:
+                    raise
+                time.sleep(min(2 ** attempt, 10))
 
+    errors = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(upload_part, part) for part in parts]
         for future in as_completed(futures):
-            future.result()
+            try:
+                future.result()
+            except Exception as error:
+                errors.append(str(error))
+                print('Asset upload failed: ' + str(error), flush=True)
+    if errors:
+        raise RuntimeError(f'{len(errors)} assets failed. Rerun upload to resume verified progress.')
     # Never publish a release until every expected object is present and verified.
-    with request(f'{base}/releases/{release["id"]}/assets?per_page=100', token) as r:
-        completed = {x['name']: x for x in json.load(r)}
+    completed = remote_assets()
     for part in parts:
         remote = completed.get(part['name'], {})
         if remote.get('size') != part['size'] or remote.get('digest') != 'sha256:' + part['sha256']:
@@ -229,7 +282,11 @@ def upload(workers=4, active_part=None):
     body = json.dumps({'draft': False}).encode()
     with request(f'{base}/releases/{release["id"]}', token, 'PATCH', body,
                  {'Content-Type': 'application/json'}) as r:
-        print('Published ' + json.load(r)['html_url'], flush=True)
+        published = json.load(r)
+    (WORK / 'upload-result.json').write_text(json.dumps({'repository': manifest['repository'],
+        'release_url': published['html_url'], 'id': published['id'], 'parts': len(parts),
+        'verified_bytes': sum(p['size'] for p in parts), 'completed_at': time.time()}, indent=2), encoding='utf-8')
+    print('Published ' + published['html_url'], flush=True)
 
 
 def digest(path):
@@ -376,7 +433,6 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--workers', type=int, choices=range(1, 9), default=4,
                         help='Concurrent Release uploads (1-8, default 4)')
-    parser.add_argument('--active-part', help='Skip an asset currently being uploaded by another worker; final verification still requires it')
     args = parser.parse_args()
     if args.command == 'inventory':
         source, assets = inventory()
@@ -385,6 +441,6 @@ if __name__ == '__main__':
     elif args.command == 'pack':
         pack()
     elif args.command == 'upload':
-        upload(args.workers, args.active_part)
+        upload(args.workers)
     else:
         restore(args.overwrite)
