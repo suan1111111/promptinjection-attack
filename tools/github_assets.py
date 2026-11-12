@@ -4,6 +4,7 @@ Uses only the Python standard library. No credentials are stored in the manifest
 """
 import argparse
 import bisect
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import io
 import json
@@ -150,13 +151,25 @@ class UploadReader:
         return block
 
 
-def upload():
+def upload(workers=4, active_part=None):
     manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
     token = credentials()
     base = f'https://api.github.com/repos/{manifest["repository"]}'
+    state_path = WORK / 'release-upload-state.json'
+    saved = json.loads(state_path.read_text(encoding='utf-8')) if state_path.exists() else {}
+    # A draft has no published tag yet. The tag lookup endpoint does not reliably
+    # find drafts, so reuse a saved ID or enumerate authenticated draft releases.
+    with request(f'{base}/releases?per_page=100', token) as r:
+        candidates = [x for x in json.load(r) if x.get('tag_name') == manifest['tag']]
+    saved_id = saved.get('id') if saved.get('repository') == manifest['repository'] and saved.get('tag') == manifest['tag'] else None
+    selected = next((x for x in candidates if x['id'] == saved_id), None)
+    if selected is None and candidates:
+        selected = max(candidates, key=lambda x: x['id'])
     try:
-        with request(f'{base}/releases/tags/{manifest["tag"]}', token) as r:
-            release = json.load(r)
+        if selected is not None:
+            release = selected
+        else:
+            raise urllib.error.HTTPError(base, 404, 'No matching release', {}, None)
     except urllib.error.HTTPError as e:
         if e.code != 404:
             raise
@@ -167,16 +180,23 @@ def upload():
                            'draft': True, 'prerelease': False}).encode()
         with request(f'{base}/releases', token, 'POST', body, {'Content-Type': 'application/json'}) as r:
             release = json.load(r)
+    state_path.write_text(json.dumps({'repository': manifest['repository'], 'tag': manifest['tag'],
+                                     'id': release['id']}), encoding='utf-8')
     with request(f'{base}/releases/{release["id"]}/assets?per_page=100', token) as r:
         existing = {x['name']: x for x in json.load(r)}
     # Validate release uploads with the small database overlay before the model volumes.
     groups = part_groups(manifest)
-    for part in [p for group in groups[1:] + groups[:1] for p in group]:
+    parts = [p for group in groups[1:] + groups[:1] for p in group]
+
+    def upload_part(part):
         old = existing.get(part['name'])
+        if part['name'] == active_part or (active_part and old and old.get('state') != 'uploaded'):
+            print('Another worker is uploading: ' + part['name'], flush=True)
+            return
         if old:
             if old.get('size') == part['size'] and old.get('digest') == 'sha256:' + part['sha256']:
                 print('Already uploaded and verified: ' + part['name'], flush=True)
-                continue
+                return
             if release.get('draft') and old.get('state') != 'uploaded':
                 with request(f'{base}/releases/assets/{old["id"]}', token, 'DELETE'):
                     pass
@@ -194,6 +214,18 @@ def upload():
         if item.get('size') != part['size'] or item.get('digest') != 'sha256:' + part['sha256']:
             raise RuntimeError('Uploaded asset failed checksum verification: ' + part['name'])
         print('Verified ' + part['name'], flush=True)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(upload_part, part) for part in parts]
+        for future in as_completed(futures):
+            future.result()
+    # Never publish a release until every expected object is present and verified.
+    with request(f'{base}/releases/{release["id"]}/assets?per_page=100', token) as r:
+        completed = {x['name']: x for x in json.load(r)}
+    for part in parts:
+        remote = completed.get(part['name'], {})
+        if remote.get('size') != part['size'] or remote.get('digest') != 'sha256:' + part['sha256']:
+            raise RuntimeError('Release remains a draft; unverified asset: ' + part['name'])
     body = json.dumps({'draft': False}).encode()
     with request(f'{base}/releases/{release["id"]}', token, 'PATCH', body,
                  {'Content-Type': 'application/json'}) as r:
@@ -342,6 +374,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['inventory', 'pack', 'upload', 'restore'])
     parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument('--workers', type=int, choices=range(1, 9), default=4,
+                        help='Concurrent Release uploads (1-8, default 4)')
+    parser.add_argument('--active-part', help='Skip an asset currently being uploaded by another worker; final verification still requires it')
     args = parser.parse_args()
     if args.command == 'inventory':
         source, assets = inventory()
@@ -350,6 +385,6 @@ if __name__ == '__main__':
     elif args.command == 'pack':
         pack()
     elif args.command == 'upload':
-        upload()
+        upload(args.workers, args.active_part)
     else:
         restore(args.overwrite)
