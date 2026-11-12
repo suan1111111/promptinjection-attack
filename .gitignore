@@ -130,3 +130,4 @@ ngrok
 *.pdf
 *.csv
 *.tsv
+/benchmark/gold_data/gold.json
