@@ -63,6 +63,10 @@ def create_app(enable_ocr: bool = True, enable_whisper: bool = True):
     # 注册服务模块
     enabled_services = []
 
+    from services.detection_api import detection_bp
+    app.register_blueprint(detection_bp)
+    enabled_services.append('DetectionCatalog')
+
     from services.frequency_api import frequency_bp
     app.register_blueprint(frequency_bp)
     enabled_services.append('ImageFrequency')
@@ -71,6 +75,8 @@ def create_app(enable_ocr: bool = True, enable_whisper: bool = True):
         try:
             from services.ocr_service import ocr_bp, init_ocr_service
             app.register_blueprint(ocr_bp)
+            from services.detection_ocr import recognize_grounding
+            app.config['DETECTION_OCR_PROVIDER'] = recognize_grounding
             enabled_services.append('OCR')
         except ImportError as e:
             logger.warning(f"OCR import failed: {e}")

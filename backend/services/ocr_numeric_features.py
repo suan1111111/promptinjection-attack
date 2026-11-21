@@ -41,7 +41,7 @@ def parse_grounding(text, width, height):
                 raise ValueError('OCR box has non-positive area')
             boxes.append({'box': [int(x1 / 999 * width), int(y1 / 999 * height),
                                   int(x2 / 999 * width), int(y2 / 999 * height)],
-                          'confidence': None})
+                          'confidence': None, 'text': segment})
     return {'text': '\n'.join(texts), 'boxes': boxes, 'box_granularity': 'layout block', 'source': 'DeepSeek grounding'}
 
 
@@ -60,7 +60,7 @@ def parse_tsv(text, width, height):
             raise ValueError('TSV boxes must use pixels of the EXIF-oriented original image')
         if not math.isfinite(confidence) or not -1 <= confidence <= 100:
             raise ValueError('Invalid TSV confidence')
-        boxes.append({'box': [x, y, x + w, y + h], 'confidence': confidence / 100 if confidence >= 0 else None})
+        boxes.append({'box': [x, y, x + w, y + h], 'confidence': confidence / 100 if confidence >= 0 else None, 'text': row['text']})
         words.append(row['text'])
     return {'text': ' '.join(words), 'boxes': boxes, 'box_granularity': 'word', 'source': 'Tesseract TSV'}
 
@@ -83,14 +83,26 @@ def quality(data):
             'confidence_min': float(min(scores)) if scores else None}
 
 
-def geometry(data, gray):
-    height, width = gray.shape
-    mask = box_mask(data['boxes'], gray.shape)
-    heights, edge_flags, contrasts = [], [], []
+def geometry_only(data, shape):
+    height, width = shape
+    mask = box_mask(data['boxes'], shape)
+    heights, edge_flags = [], []
     for record in data['boxes']:
         x1, y1, x2, y2 = record['box']
         heights.append((y2 - y1) / height)
         edge_flags.append(x1 < width * .05 or y1 < height * .05 or x2 > width * .95 or y2 > height * .95)
+    return {'text_area_ratio': float(mask.mean()),
+            'relative_box_height_mean': float(np.mean(heights)) if heights else None,
+            'relative_box_height_max': max(heights) if heights else None,
+            'edge_text_box_ratio': float(np.mean(edge_flags)) if edge_flags else 0.0}
+
+
+def contrast_only(data, gray):
+    height, width = gray.shape
+    mask = box_mask(data['boxes'], gray.shape)
+    contrasts = []
+    for record in data['boxes']:
+        x1, y1, x2, y2 = record['box']
         bx1, by1, bx2, by2 = max(0, x1 - 3), max(0, y1 - 3), min(width, x2 + 3), min(height, y2 + 3)
         ring = ~mask[by1:by2, bx1:bx2]
         surrounding = gray[by1:by2, bx1:bx2][ring]
@@ -98,11 +110,11 @@ def geometry(data, gray):
             # Proxy: largest grayscale deviation from surrounding median.
             inside = gray[y1:y2, x1:x2]
             contrasts.append(float(np.max(np.abs(inside - np.median(surrounding)))))
-    return {'text_area_ratio': float(mask.mean()),
-            'relative_box_height_mean': float(np.mean(heights)) if heights else None,
-            'relative_box_height_max': max(heights) if heights else None,
-            'edge_text_box_ratio': float(np.mean(edge_flags)) if edge_flags else 0.0,
-            'box_background_contrast_mean': float(np.mean(contrasts)) if contrasts else None}
+    return {'box_background_contrast_mean': float(np.mean(contrasts)) if contrasts else None}
+
+
+def geometry(data, gray):
+    return {**geometry_only(data, gray.shape), **contrast_only(data, gray)}
 
 
 def overlap(text, response, prefix):

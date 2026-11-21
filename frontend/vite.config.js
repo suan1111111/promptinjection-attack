@@ -23,6 +23,12 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true, // 允许所有主机 (Cloudflare Tunnel / Tailscale)
     proxy: {
+      // Detection tree metadata and future execution endpoints.
+      '/api/detection': {
+        target: 'http://127.0.0.1:5000',
+        changeOrigin: true,
+        secure: false
+      },
       // PrivaSee 统一后端 API 代理 - 端口 5000
       // OCR 服务: /ocr-api -> /api/ocr
       '/ocr-api': {
